@@ -2,7 +2,6 @@ import numpy as np
 from scipy.stats import iqr
 from scipy.signal import butter, filtfilt, find_peaks
 
-
 def signalToFrames(signal, window, step):
     """Divides given signal in frames of length of 'window' using
     a 'step'. Returns numpy array of frames."""
