@@ -1,27 +1,30 @@
 import numpy as np
 from scipy.stats import iqr
 from scipy.signal import butter, filtfilt, find_peaks
+from pyAudioAnalysis import audioFeatureExtraction as afe
 
 def signalToFrames(signal, window, step):
     """Divides given signal in frames of length of 'window' using
     a 'step'. Returns numpy array of frames."""
-    length, curr_start, frames = len(signal), 0, np.array([])    
+    length, curr_start, frames = np.size(signal), 0, []    
     while(curr_start + window < length):
-        frames = np.append(frames,signal[curr_start:curr_start + window])
+        x = signal[curr_start:curr_start + window]
+        frames.append(x)
         curr_start = curr_start + step
     return frames
 
 
 def frameEnergy(frame):
     """Computes energy of frame signal"""
-    return np.sum(frame**2) / np.float64(len(frame))   
+    return np.sum(frame**2) / np.float64(np.size(frame))   
 #np.float64 may have to change
 #depends on audio reading algorithm
 
 def energyFrames(signalFrames):
-    """Returns an array of energy values
-    for each frame in signalFrames"""
-    x = np.zeros(np.float64(len(signalFrames)))
+    """Returns an array of energy values. Each
+    value corresponds to the energy of a frame 
+    in signal frames"""
+    x = np.zeros(np.size(signalFrames))
     counter = 0
     for frame in signalFrames:
         x[counter] = frameEnergy(frame)
@@ -31,22 +34,30 @@ def energyFrames(signalFrames):
 #depends on audio reading algorithm
     
 
-def autocorrelation(x):
-    result = np.correlate(x, x, mode = 'full')
-    return result[result.size//2:]
-
-def framePitch(frame):
-    """Computes pitch (F0) of frame signal"""
-    x = autocorrelation(frame)
-    peaks, _ = find_peaks(x)
-    return peaks[1]   
+#def autocorrelation(x):
+#    """Computes the autocorrelation of signal
+#    frame x"""
+#    result = np.correlate(x, x, mode = 'full')
+#    return result[np.size(result)//2:]
+#
+#def framePitch(frame):
+#    """Computes pitch (F0) of frame signal"""
+#    x = autocorrelation(frame)
+#    peaks, _ = find_peaks(x)
+#    if np.size(peaks) >= 1:
+#        return peaks[0]
+#    else:
+#        return 0 #lysi anagkhs
 
    
 def pitchFrames(signalFrames):
-    x = np.zeros(np.float64(len(signalFrames)))
+    """Returns an array of pitch(FO) values. Each
+    value corresponds to a frame in signal frames"""
+    x = np.zeros(np.size(signalFrames))
     counter = 0
     for frame in signalFrames:
-        x[counter] = framePitch(frame)
+        #x[counter] = framePitch(frame)
+        x[counter] = afe.stZCR(frame)
         counter = counter + 1
     return x
 
@@ -54,8 +65,6 @@ def pitchFrames(signalFrames):
 
 """No additional functions for max, mean, variance of 
 energy and pitch. Numpy functions do the job(max, np.mean, np.var)"""
-
-
 
 """Two functions below that will be used for the computation
 of max, mean and median DURATION of rising/falling slopes
@@ -67,18 +76,18 @@ def durRisingSlopes(Frames):
     """Computes durations (counted in number of frames)
     of RISING slopes.Returns an array of
     all durations of RISING slopes in the signal."""
-    counter, previous, durations = 0, 0, np.array([])
+    counter, previous, durations = 0, 0, []
     for frame in Frames:
         if frame > previous:
             counter = counter + 1
         else:
             if counter > 1:
-                durations = np.append(durations,counter)
+                durations.append(counter)
                 counter = 1
         previous = frame
     if counter > 1:
-        durations = np.append(durations,counter)
-    if durations.size == 0:
+        durations.append(counter)
+    if len(durations) == 0:
         return 0
     else:
         return durations
@@ -88,18 +97,18 @@ def durFallingSlopes(Frames):
     """Computes durations (counted in number of frames)
     of FALLING slopes.Returns an array of
     all durations of FALLING slopes in the signal."""
-    counter, previous, durations = 1, 0, np.array([])
+    counter, previous, durations = 1, 0, []
     for frame in Frames:
         if frame < previous:
             counter = counter + 1
         else:
             if counter > 1:
-                durations = np.append(durations,counter)
+                durations.append(counter)
                 counter = 1
         previous = frame
     if counter > 1:
-        durations = np.append(durations,counter)
-    if durations.size == 0:
+        durations.append(counter)
+    if len(durations) == 0:
         return 0
     else:
         return durations
@@ -115,16 +124,16 @@ of pitch/energy"""
 def valRisingSlopes(Frames):
     """Computes values of RISING slopes.Returns an array of
     all values of RISING slopes in the signal."""
-    previous, slopes, start = 0, np.array([]), 1
+    previous, slopes, start = 0, [], 1
     for frame in Frames:
         if start == 1:
             previous = frame
             start = 0
             continue
         if frame > previous:
-            slopes = np.append(slopes,frame - previous)
+            slopes.append(frame - previous)
         previous = frame
-    if slopes.size == 0:
+    if len(slopes) == 0:
         return 0
     else:
         return slopes
@@ -132,16 +141,16 @@ def valRisingSlopes(Frames):
 def valFallingSlopes(Frames):
     """Computes values of FALLING slopes.Returns an array of
     all values of FALLING slopes in the signal."""
-    previous, slopes, start = 0, np.array([]), 1
+    previous, slopes, start = 0, [], 1
     for frame in Frames:
         if start == 1:
             previous = frame
             start = 0
             continue
         if frame < previous:
-            slopes = np.append(slopes,previous - frame)
+            slopes.append(previous - frame)
         previous = frame
-    if slopes.size == 0:
+    if len(slopes) == 0:
         return 0
     else:
         return slopes 
@@ -149,7 +158,7 @@ def valFallingSlopes(Frames):
 """--------------------------------------------------------"""
 
 
-def featExtract(input_signal, fs, window, step):
+def emoFeatExtract(input_signal, fs, window, step):
    
     #signal filtering
     nyq = 0.5*fs
@@ -161,7 +170,7 @@ def featExtract(input_signal, fs, window, step):
     
     window = int(window)
     step = int(step)
-    signal = np.double(signal)
+    signal = np.double(input_signal)
     vector1 = np.zeros(19)
     vector2 = np.zeros(19)
 
@@ -173,7 +182,6 @@ def featExtract(input_signal, fs, window, step):
     
     
     signalFrames = signalToFrames(signal, window, step)
-    
     EnergyValues = energyFrames(signalFrames)
     PitchValues = pitchFrames(signalFrames)
     
@@ -231,5 +239,4 @@ def featExtract(input_signal, fs, window, step):
     vector2[17] = iqr(drsp)
     vector2[18] = iqr(dfsp)
     
-    return [vector1,vector2]
-    
+    return np.concatenate((vector1,vector2))
