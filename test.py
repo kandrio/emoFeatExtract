@@ -1,7 +1,8 @@
 """This is a test script for emoFeatExtract.py"""
 import os
 from pyAudioAnalysis import audioBasicIO
-from emoFeatExtract import emoFeatExtract
+from emoFeatExtract2 import emoFeatExtract
+
 from sklearn import svm
 
 #gets label(emotion) that is mentioned in each sample name
@@ -13,6 +14,8 @@ def getEmotionLabel(x):
 def getSpeakerLabel(x):
     return x[18:20]
 
+def trainortest(x):
+    return x[15:17]
 
 os.chdir('C:/Users/konst_000/Desktop/Σχολή/6ο Εξάμηνο/ΨΕΣ/Speech Emotion Recognition/Audio Database/Complete')
 fileList = os.listdir('C:/Users/konst_000/Desktop/Σχολή/6ο Εξάμηνο/ΨΕΣ/Speech Emotion Recognition/Audio Database/Complete')
@@ -21,15 +24,18 @@ train_labelList = []   #list of strings used to store the labels(emotions) for e
 test_featureList = []  #same for testing samples
 test_labelList = []    #same for testing samples
 
+
 for f in fileList:
+    label = getEmotionLabel(f)
+    if (label != '02' and label != '06'):
+        continue
     [Fs, sample] = audioBasicIO.readAudioFile(f)
     sample = audioBasicIO.stereo2mono(sample) #feature extraction can be performed only on mono signals
-    label = getEmotionLabel(f)
     speaker = getSpeakerLabel(f)
     
     features = emoFeatExtract(sample, Fs, 0.050*Fs, 0.025*Fs)
-    
-    if(speaker >= '23' and speaker <= '24'):
+
+    if(speaker == '05'):
         test_labelList.append(label)
         test_featureList.append(features)
     else:
@@ -40,13 +46,13 @@ clf = svm.SVC()
 clf.fit(train_featureList, train_labelList)
 predicted = clf.predict(test_featureList)
 
-print(test_labelList)
-print(predicted)
-
 summ = 0
 L = len(test_labelList)
 for i in range(L):
     if test_labelList[i] == predicted[i]:
         summ = summ+1
 summ = summ/L
+
+print(test_labelList)
+print(predicted)
 print(summ)

@@ -1,6 +1,7 @@
 import numpy as np
+import math
 from scipy.stats import iqr
-from scipy.signal import butter, filtfilt, find_peaks
+from scipy.signal import butter, filtfilt#, find_peaks
 from pyAudioAnalysis import audioFeatureExtraction as afe
 
 def signalToFrames(signal, window, step):
@@ -158,11 +159,22 @@ def valFallingSlopes(Frames):
 """--------------------------------------------------------"""
 
 
+def detect_leading_silence(signal, threshold = 20.0, step = 10):
+    """This function removes preceding silence parts
+    of the audio signal.It actually returns the index
+    at which the speaker starts speaking"""
+    trim_index = 0           # starting value of index to be returned
+    assert step > 0
+    while trim_index < len(signal) and (np.mean(abs(signal[trim_index:trim_index+step])) == 0 or 20*(math.log10(np.mean(abs(signal[trim_index:trim_index+step])))) < threshold):
+        trim_index += step
+    return trim_index
+
+
 def emoFeatExtract(input_signal, fs, window, step):
-   
-    #signal filtering
-    nyq = 0.5*fs
+    print(3)
+#    signal filtering
     
+    nyq = 0.5*fs
     low = 75/nyq
     high = 500/nyq
     b, a = butter(5, [low,high], btype='band')
@@ -173,13 +185,18 @@ def emoFeatExtract(input_signal, fs, window, step):
     signal = np.double(input_signal)
     vector1 = np.zeros(19)
     vector2 = np.zeros(19)
-
+    
+    start_trim = detect_leading_silence(signal)
+    end_trim = detect_leading_silence(np.flip(signal))
+    duration = len(signal)    
+    signal = signal[start_trim:duration-end_trim]
+    
     #signal normalization
     signal = signal / (2.0 ** 15)
     DC = signal.mean()
     MAX = (np.abs(signal)).max()
     signal = (signal - DC) / (MAX + 0.0000000001)
-    
+    signal = signal - DC   
     
     signalFrames = signalToFrames(signal, window, step)
     EnergyValues = energyFrames(signalFrames)
