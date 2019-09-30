@@ -3,6 +3,8 @@ import math
 from scipy.stats import iqr
 from scipy.signal import butter, filtfilt#, find_peaks
 from pyAudioAnalysis import audioFeatureExtraction as afe
+from scipy import fft
+
 
 def signalToFrames(signal, window, step):
     """Divides given signal in frames of length of 'window' using
@@ -73,7 +75,7 @@ of pitch/energy"""
 
 """-------------------------------------------------------------"""
 
-def durRisingSlopes(Frames):
+def durRisingSlopes(Frames, threshold = 0):
     """Computes durations (counted in number of frames)
     of RISING slopes.Returns an array of
     all durations of RISING slopes in the signal."""
@@ -81,10 +83,14 @@ def durRisingSlopes(Frames):
     for frame in Frames:
         if frame > previous:
             counter = counter + 1
+            peak = frame
         else:
             if counter > 1:
-                durations.append(counter)
-                counter = 1
+                if frame > (1-threshold)*peak:
+                    counter = counter + 1
+                else:
+                    durations.append(counter)
+                    counter = 1
         previous = frame
     if counter > 1:
         durations.append(counter)
@@ -94,7 +100,7 @@ def durRisingSlopes(Frames):
         return durations
 
 
-def durFallingSlopes(Frames):
+def durFallingSlopes(Frames, threshold = 0):
     """Computes durations (counted in number of frames)
     of FALLING slopes.Returns an array of
     all durations of FALLING slopes in the signal."""
@@ -102,10 +108,14 @@ def durFallingSlopes(Frames):
     for frame in Frames:
         if frame < previous:
             counter = counter + 1
+            peak = frame
         else:
             if counter > 1:
-                durations.append(counter)
-                counter = 1
+                if frame < (1+threshold)*peak:
+                    counter = counter + 1
+                else:
+                    durations.append(counter)
+                    counter = 1
         previous = frame
     if counter > 1:
         durations.append(counter)
@@ -139,6 +149,7 @@ def valRisingSlopes(Frames):
     else:
         return slopes
     
+    
 def valFallingSlopes(Frames):
     """Computes values of FALLING slopes.Returns an array of
     all values of FALLING slopes in the signal."""
@@ -170,9 +181,40 @@ def detect_leading_silence(signal, threshold = 20.0, step = 10):
     return trim_index
 
 
+def mfcc(Frames, fs):
+    win = len(Frames[0])
+    nFFT = int(win/2)
+    [fbank, freqs] = afe.mfccInitFilterBanks(fs, nFFT)
+    seq = []
+    for frame in Frames:
+        ft = abs(fft(frame))              
+        ft = ft[0:nFFT]                   
+        ft = ft/win
+        seq.append(afe.stMFCC(ft, fbank, 4))
+    Mean = np.mean(seq,0)
+    Max = np.amax(seq,0)
+    Min = np.amin(seq,0)
+    return(np.concatenate((Mean,Max,Min)))
+    
+
+def spectralFlux(Frames):
+    start = 1
+    seq = []
+    for frame in Frames:
+        current = abs(fft(frame))
+        if start == 1:
+            previous = current
+            start = 0
+            continue
+        seq.append(afe.stSpectralFlux(current,previous))
+        previous = current
+    return np.mean(seq)
+                    
+       
+
+
 def emoFeatExtract(input_signal, fs, window, step):
-    print(3)
-#    signal filtering
+#   signal filtering
     
     nyq = 0.5*fs
     low = 75/nyq
@@ -185,6 +227,9 @@ def emoFeatExtract(input_signal, fs, window, step):
     signal = np.double(input_signal)
     vector1 = np.zeros(19)
     vector2 = np.zeros(19)
+    vector3 = np.zeros(13)
+    
+    threshold = 0.00
     
     start_trim = detect_leading_silence(signal)
     end_trim = detect_leading_silence(np.flip(signal))
@@ -206,8 +251,8 @@ def emoFeatExtract(input_signal, fs, window, step):
     vector1[1] = np.mean(EnergyValues)
     vector1[2] = np.var(EnergyValues)
     
-    drse = durRisingSlopes(EnergyValues)
-    dfse = durFallingSlopes(EnergyValues)
+    drse = durRisingSlopes(EnergyValues,threshold)
+    dfse = durFallingSlopes(EnergyValues,threshold)
     vrse = valRisingSlopes(EnergyValues)
     vfse = valFallingSlopes(EnergyValues)
     
@@ -234,8 +279,8 @@ def emoFeatExtract(input_signal, fs, window, step):
     vector2[1] = np.mean(PitchValues)
     vector2[2] = np.var(PitchValues)
     
-    drsp = durRisingSlopes(PitchValues)
-    dfsp = durFallingSlopes(PitchValues)
+    drsp = durRisingSlopes(PitchValues,threshold)
+    dfsp = durFallingSlopes(PitchValues,threshold)
     vrsp = valRisingSlopes(PitchValues)
     vfsp = valFallingSlopes(PitchValues)
     
@@ -256,4 +301,7 @@ def emoFeatExtract(input_signal, fs, window, step):
     vector2[17] = iqr(drsp)
     vector2[18] = iqr(dfsp)
     
-    return np.concatenate((vector1,vector2))
+    vector3[0:12] = mfcc(signalFrames, fs) 
+    vector3[12] = spectralFlux(signalFrames)
+    
+    return np.concatenate((vector1,vector2,vector3))
