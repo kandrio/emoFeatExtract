@@ -4,19 +4,18 @@ the K-folds cross-validation
 technique is used, where K == 24 is the
 number of different speakers on the RAVDESS
 database. Currently, all samples that are used
-contain calm (02) or fearful (06) emotions.
-The classification takes place between these 2
+contain '02', '03', ...,  '06' emotions.
+The classification takes place between these 5
 emotional states."""
 
 #current score: 
-#[0.8125 0.875  0.8125 0.875  0.75   0.875  0.8125 0.875  0.5625 0.75
-# 0.75   0.9375 0.6875 0.8125 0.8125 0.75   1.     0.8125 0.9375 0.875
-# 0.8125 0.6875 0.5625 0.875 ]
-# 0.8046875
+#[0.375 0.4   0.4   0.375 0.35  0.475 0.45  0.45  0.275 0.4   0.325 0.3
+# 0.25  0.55  0.425 0.475 0.525 0.275 0.475 0.45  0.275 0.225 0.225 0.4  ]
+#0.3802083333333333
 
 import os
 from pyAudioAnalysis import audioBasicIO
-from emoFeatExtract2 import emoFeatExtract
+from emoFeatExtract import emoFeatExtract
 import numpy as np
 from sklearn import svm
 from sklearn.model_selection import cross_val_score as cvs
@@ -44,7 +43,7 @@ speakerList = [] #list of strings used to store the speaker identity
 
 for f in fileList:
     label = getEmotionLabel(f)
-    if (label != '02' and label != '06'):
+    if (label != '02' and label != '03' and label != '04' and label != '05' and label != '06'):
         continue
     [Fs, sample] = audioBasicIO.readAudioFile(f)
     sample = audioBasicIO.stereo2mono(sample) #feature extraction can be performed only on mono signals
