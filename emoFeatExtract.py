@@ -1,7 +1,6 @@
 import numpy as np
 import math
 from scipy.stats import iqr
-#from scipy.signal import butter, filtfilt, find_peaks
 from pyAudioAnalysis import audioFeatureExtraction as afe
 from scipy import fft
 
@@ -21,11 +20,12 @@ def frameEnergy(frame):
     """Computes energy of frame signal"""
     return np.sum(frame**2) / np.float64(np.size(frame))   
 
+
 def energyFrames(signalFrames):
     """Returns an array of energy values. Each
     value corresponds to the energy of a frame 
     in signal frames"""
-    x = np.zeros(np.size(signalFrames))
+    x = np.zeros(len(signalFrames))
     counter = 0
     for frame in signalFrames:
         x[counter] = frameEnergy(frame)
@@ -34,9 +34,10 @@ def energyFrames(signalFrames):
 
 
 """The following functions are an alternative solution to
-pitch extraction. We track the pitch of a frame by finding 
+pitch extraction using zero-crossing-rate. We track the pitch of a frame by finding 
 the first peak of the autocorrelation function. Currently,
-not as efficient as the zcr method and the PRAAT algorithm."""
+not as efficient as the zcr method. That's why they are 
+commented out."""
 
 #def autocorrelation(x):
 #    """Computes the autocorrelation of signal
@@ -51,15 +52,16 @@ not as efficient as the zcr method and the PRAAT algorithm."""
 #    if np.size(peaks) >= 1:
 #        return peaks[0]
 #    else:
-#        return 0 #lysi anagkhs
+#        return 0
 
    
 def pitchFrames(signalFrames):
     """Returns an array of pitch(FO) values. Each
     value corresponds to a frame in signal frames.
     It uses the zero-crossing-rate method to extract
-    the pitch of the frame."""
-    x = np.zeros(np.size(signalFrames))
+    the pitch of each frame. Used zero-crossing-rate function
+    from pyAudioAnalysis Python Package"""
+    x = np.zeros(len(signalFrames))
     counter = 0
     for frame in signalFrames:
         #x[counter] = framePitch(frame)
@@ -83,32 +85,29 @@ def durRisingSlopes(Frames, threshold = 0.0):
     all durations of RISING slopes in the signal.
     
     ARGUMENTS:
-        Frames: List of values of pitch or energy
+        Frames: List of values of pitch or energy.
         threshold: Helping variable (belongs to [0,1] range)
                    that is used to ignore small falling slopes
                    between two more dominant rising slopes.
                    
     RETURNS:
         List of duration of all rising slopes."""
-    counter, previous, durations = 0, 0, []
-    for frame in Frames:
-        if frame > previous:
+    counter, previous, durations = 1, Frames[0], []
+    for i in range(len(Frames)):
+        if Frames[i] > previous:
             counter = counter + 1
-            peak = frame
+            peak = Frames[i]
         else:
             if counter > 1:
-                if frame > (1-threshold)*peak:
+                if Frames[i] > (1-threshold)*peak:
                     counter = counter + 1
                 else:
                     durations.append(counter)
                     counter = 1
-        previous = frame
+        previous = Frames[i]
     if counter > 1:
         durations.append(counter)
-    if len(durations) == 0:
-        return 0
-    else:
-        return durations
+    return durations
 
 
 def durFallingSlopes(Frames, threshold = 0.0):
@@ -117,32 +116,29 @@ def durFallingSlopes(Frames, threshold = 0.0):
     all durations of FALLING slopes in the signal.
     
     ARGUMENTS:
-        Frames: List of values of pitch or energy
+        Frames: List of values of pitch or energy.
         threshold: Helping variable (belongs to [0,1] range)
                    that is used to ignore small rising slopes
                    between two more dominant falling slopes.
                    
     RETURNS:
         List of duration of all falling slopes."""
-    counter, previous, durations = 1, 0, []
-    for frame in Frames:
-        if frame < previous:
+    counter, previous, durations = 1, Frames[0], []
+    for i in range(len(Frames)):
+        if Frames[i] < previous:
             counter = counter + 1
-            peak = frame
+            peak = Frames[i]
         else:
             if counter > 1:
-                if frame < (1+threshold)*peak:
+                if Frames[i] < (1+threshold)*peak:
                     counter = counter + 1
                 else:
                     durations.append(counter)
                     counter = 1
-        previous = frame
+        previous = Frames[i]
     if counter > 1:
         durations.append(counter)
-    if len(durations) == 0:
-        return 0
-    else:
-        return durations
+    return durations
     
 """-------------------------------------------------------"""
 
@@ -155,42 +151,28 @@ of pitch/energy"""
 def valRisingSlopes(Frames):
     """Computes values of RISING slopes.Returns a list of
     all values of RISING slopes in the signal."""
-    previous, slopes, start = 0, [], 1
-    for frame in Frames:
-        if start == 1:
-            previous = frame
-            start = 0
-            continue
-        if frame > previous:
-            slopes.append(frame - previous)
-        previous = frame
-    if len(slopes) == 0:
-        return 0
-    else:
-        return slopes
+    previous, slopes = Frames[0], []
+    for i in range(len(Frames)):
+        if Frames[i] > previous:
+            slopes.append(Frames[i] - previous)
+        previous = Frames[i]
+    return slopes
     
     
 def valFallingSlopes(Frames):
     """Computes values of FALLING slopes.Returns a list of
     all values of FALLING slopes in the signal."""
-    previous, slopes, start = 0, [], 1
-    for frame in Frames:
-        if start == 1:
-            previous = frame
-            start = 0
-            continue
-        if frame < previous:
-            slopes.append(previous - frame)
-        previous = frame
-    if len(slopes) == 0:
-        return 0
-    else:
-        return slopes 
+    previous, slopes = Frames[0], []
+    for i in range(len(Frames)):
+        if Frames[i] < previous:
+            slopes.append(previous - Frames[i])
+        previous = Frames[i]
+    return slopes
 
 """--------------------------------------------------------"""
 
 
-def detect_leading_silence(signal, threshold = 20.0, step = 10):
+def detect_leading_silence(signal, threshold = 20.0, step = 100):
     """This function removes preceding silence parts
     of the audio signal.It actually returns the index
     at which the speaker starts speaking.
@@ -206,7 +188,7 @@ def detect_leading_silence(signal, threshold = 20.0, step = 10):
         The index at which the speaker starts speaking."""
     trim_index = 0           # starting value of index to be returned
     assert step > 0
-    while trim_index < len(signal) and (np.mean(abs(signal[trim_index:trim_index+step])) == 0 or 20*(math.log10(np.mean(abs(signal[trim_index:trim_index+step])))) < threshold):
+    while trim_index+step < len(signal) and (np.mean(abs(signal[trim_index:trim_index+step])) == 0 or 20*(math.log10(np.mean(abs(signal[trim_index:trim_index+step])))) < threshold):
         trim_index += step
     return trim_index
 
@@ -242,14 +224,15 @@ def mfcc(Frames, fs, mfccNumber):
 
 def spectralFlux(Frames):
     """
-    Uses the simple algorithm from audioFeatureExtraction of
-    pyAudioAnalysis to compute spectral flux.
+    Uses the Spectral Flux formula from "https://www.sciencedirect.com/topics/
+    engineering/spectral-flux" to compute short time spectral flux values 
+    for the signal.
     
     ARGUMENTS:
         Frames: List of signal frames
         
     RETURNS:
-        Mean value of spectral flux between successive frames.
+        List of values of spectral flux (seq) between successive frames.
     """
     start = 1
     seq = []
@@ -259,47 +242,32 @@ def spectralFlux(Frames):
             previous = current
             start = 0
             continue
-        seq.append(afe.stSpectralFlux(current,previous))
+        currsum = np.sum(current)
+        prevsum = np.sum(previous)
+        stFlux = np.sum((current / currsum - previous / prevsum) ** 2)
+        seq.append(stFlux)
         previous = current
-    return np.mean(seq)
+    return seq
                   
-        
-def removeZeros(pitchValues):
-    """Removes zero values from array of pitch values
-    when the PRAAT (parselmouth) pitch-extraction algorithm
-    is used."""
-    final = []
-    for value in pitchValues:
-        if value != 0.0:
-            final.append(value)
-    return np.asarray(final)
-                    
-       
 
 
 def emoFeatExtract(input_signal, fs, window, step):
-#   signal filtering
-    
-#    nyq = 0.5*fs
-#    low = 75/nyq
-#    high = 500/nyq
-#    b, a = butter(5, [low,high], btype='band')
-#    signal = filtfilt(b, a, input_signal)
-    
+
     error_thres = 0.00
-    mfccNumber = 4
+    mfccNumber = 12                                      #Number of Mel-Frequency Cepstral Coefficients
     
     window = int(window)
     step = int(step)
     signal = np.double(input_signal)
-    vector1 = np.zeros(19)
-    vector2 = np.zeros(19)
-    vector3 = np.zeros(3*mfccNumber+1)
+    vector1 = np.zeros(19)                               #Energy Features
+    vector2 = np.zeros(19)                               #Pitch Features
+    vector3 = np.zeros(3*mfccNumber+3)                   #Spectral Features
     
+    #silence removal
     start_trim = detect_leading_silence(signal)
     end_trim = detect_leading_silence(np.flip(signal))
     duration = len(signal)    
-    signal = signal[start_trim:duration-end_trim]
+    signal = signal[start_trim:duration-end_trim]        #Signal after silence removal 
     
     #signal normalization
     signal = signal / (2.0 ** 15)
@@ -308,9 +276,9 @@ def emoFeatExtract(input_signal, fs, window, step):
     signal = (signal - DC) / (MAX + 0.0000000001)
     signal = signal - DC   
     
-    signalFrames = signalToFrames(signal, window, step)
-    EnergyValues = energyFrames(signalFrames)
-    PitchValues = pitchFrames(signalFrames)
+    signalFrames = signalToFrames(signal, window, step)  #Break signal into frames
+    EnergyValues = energyFrames(signalFrames)            #Compute energy value of each fram
+    PitchValues = pitchFrames(signalFrames)              #Compute pitch value of each frame
     
     vector1[0] = max(EnergyValues)
     vector1[1] = np.mean(EnergyValues)
@@ -365,7 +333,12 @@ def emoFeatExtract(input_signal, fs, window, step):
     vector2[17] = iqr(drsp)
     vector2[18] = iqr(dfsp)
     
-    vector3[0:3*mfccNumber] = mfcc(signalFrames, fs, mfccNumber) 
-    vector3[3*mfccNumber] = spectralFlux(signalFrames)
+    vector3[0:3*mfccNumber] = mfcc(signalFrames, fs, mfccNumber)     #Computation of MFCC
     
+    flux = spectralFlux(signalFrames)                                #Computation of Spectral Flux
+    
+    vector3[3*mfccNumber] = np.mean(flux)
+    vector3[3*mfccNumber+1] = max(flux)
+    vector3[3*mfccNumber+2] = min(flux)
+  
     return np.concatenate((vector1,vector2,vector3))
