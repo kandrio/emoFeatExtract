@@ -1,0 +1,14 @@
+README.md
+setup.py
+emoFeatExtract/__init__.py
+emoFeatExtract/emoFeatExtract.py
+emoFeatExtract.egg-info/PKG-INFO
+emoFeatExtract.egg-info/SOURCES.txt
+emoFeatExtract.egg-info/dependency_links.txt
+emoFeatExtract.egg-info/top_level.txt
+tests/__init__.py
+tests/test.py
+tests/test2.py
+tests/test3.py
+tests/testEmoDB.py
+tests/testRAVDESS.py
