@@ -1,2 +1,2 @@
 # emoFeatExtract
-Speech emotion recognition feature extraction python package
+A feature extraction package for speech emotion recognition.
